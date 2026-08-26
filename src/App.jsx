@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Plus, Trash2, X, ChevronDown, ChevronRight, GitBranch,
-  Home, Search, Loader2, Pencil, ArrowLeft, Check, User
+  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -21,6 +21,16 @@ const TABAQAT = [
 
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 
+/* Warna konsisten dijana daripada nama kategori/kumpulan (cth. negara/mazhab),
+   supaya kategori yang sama sentiasa dapat warna yang sama tanpa perlu disimpan. */
+function categoryColor(name) {
+  if (!name) return null;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 52%, 42%)`;
+}
+
 const SEED_PERAWI = [
   { id: "p_nabi", nama_arab: "مُحَمَّد رَسُوْل اللّٰه ﷺ", nama_rumi: "Nabi Muhammad ﷺ", gelaran: "", tabaqat: "Rasulullah ﷺ", wafat: "11", catatan: "Menerima al-Quran daripada Malaikat Jibril a.s." },
   { id: "p_uthman", nama_arab: "عُثْمَان بْن عَفَّان", nama_rumi: "Uthman bin Affan", gelaran: "Khalifah ke-3", tabaqat: "Sahabat", wafat: "35", catatan: "" },
@@ -28,10 +38,10 @@ const SEED_PERAWI = [
   { id: "p_zaid", nama_arab: "زَيْد بْن ثَابِت", nama_rumi: "Zaid bin Thabit", gelaran: "", tabaqat: "Sahabat", wafat: "45", catatan: "Ketua penulis wahyu." },
   { id: "p_ubay", nama_arab: "أُبَيّ بْن كَعْب", nama_rumi: "Ubay bin Ka'b", gelaran: "", tabaqat: "Sahabat", wafat: "30?", catatan: "Tahun wafat berbeza mengikut riwayat." },
   { id: "p_sulami", nama_arab: "أَبُو عَبْدِ الرَّحْمَن السُّلَمِي", nama_rumi: "Abu Abd al-Rahman al-Sulami", gelaran: "", tabaqat: "Tabi'in", wafat: "74", catatan: "" },
-  { id: "p_asim", nama_arab: "عَاصِم بْن أَبِي النَّجُود", nama_rumi: "'Asim bin Abi al-Najud", gelaran: "Imam Kufah", tabaqat: "Imam Qiraat", wafat: "127", catatan: "" },
-  { id: "p_hafs", nama_arab: "حَفْص بْن سُلَيْمَان", nama_rumi: "Hafs bin Sulaiman", gelaran: "", tabaqat: "Imam Qiraat", wafat: "180", catatan: "Riwayat yang paling meluas digunakan hari ini." },
-  { id: "p_nafi", nama_arab: "نَافِع بْن عَبْد الرَّحْمَن", nama_rumi: "Nafi' bin Abd al-Rahman", gelaran: "Imam Madinah", tabaqat: "Imam Qiraat", wafat: "169", catatan: "" },
-  { id: "p_warsh", nama_arab: "عُثْمَان بْن سَعِيد الوَرْش", nama_rumi: "Warsh (Uthman bin Sa'id)", gelaran: "", tabaqat: "Imam Qiraat", wafat: "197", catatan: "" },
+  { id: "p_asim", nama_arab: "عَاصِم بْن أَبِي النَّجُود", nama_rumi: "'Asim bin Abi al-Najud", gelaran: "Imam Kufah", tabaqat: "Imam Qiraat", wafat: "127", kategori: "Iraq", catatan: "" },
+  { id: "p_hafs", nama_arab: "حَفْص بْن سُلَيْمَان", nama_rumi: "Hafs bin Sulaiman", gelaran: "", tabaqat: "Imam Qiraat", wafat: "180", kategori: "Iraq", catatan: "Riwayat yang paling meluas digunakan hari ini." },
+  { id: "p_nafi", nama_arab: "نَافِع بْن عَبْد الرَّحْمَن", nama_rumi: "Nafi' bin Abd al-Rahman", gelaran: "Imam Madinah", tabaqat: "Imam Qiraat", wafat: "169", kategori: "Madinah", catatan: "" },
+  { id: "p_warsh", nama_arab: "عُثْمَان بْن سَعِيد الوَرْش", nama_rumi: "Warsh (Uthman bin Sa'id)", gelaran: "", tabaqat: "Imam Qiraat", wafat: "197", kategori: "Mesir", catatan: "" },
 ];
 
 const SEED_SANAD = [
@@ -70,6 +80,7 @@ export default function PokokSanadApp() {
   const [editingPerawi, setEditingPerawi] = useState(null);
   const [showAddSanad, setShowAddSanad] = useState(false);
   const [sanadPrefill, setSanadPrefill] = useState(null);
+  const [showLegend, setShowLegend] = useState(false);
 
   /* ---------- load (localStorage) ---------- */
   useEffect(() => {
@@ -121,6 +132,48 @@ export default function PokokSanadApp() {
     const s = new Set(sanad.map((e) => e.riwayat).filter(Boolean));
     return ["Semua", ...Array.from(s).sort()];
   }, [sanad]);
+
+  /* Peringkat sanad = bilangan langkah terpendek dari Rasulullah ﷺ ke setiap
+     perawi, dikira merentasi SEMUA riwayat (bukan ikut penapis semasa),
+     supaya ia mencerminkan struktur data sebenar, bukan paparan semasa. */
+  const distanceMap = useMemo(() => {
+    const map = {};
+    const childrenOf = {};
+    sanad.forEach((e) => {
+      if (!childrenOf[e.guru_id]) childrenOf[e.guru_id] = [];
+      childrenOf[e.guru_id].push(e.murid_id);
+    });
+    const roots = perawi.filter((p) => p.tabaqat === "Rasulullah ﷺ").map((p) => p.id);
+    const queue = [];
+    roots.forEach((id) => {
+      map[id] = 0;
+      queue.push(id);
+    });
+    let qi = 0;
+    while (qi < queue.length) {
+      const cur = queue[qi++];
+      (childrenOf[cur] || []).forEach((next) => {
+        if (!(next in map)) {
+          map[next] = map[cur] + 1;
+          queue.push(next);
+        }
+      });
+    }
+    return map;
+  }, [perawi, sanad]);
+
+  /* Petunjuk warna kategori (cth. negara/kumpulan qiraat), seperti legend
+     dalam poster asal — dijana automatik daripada data sebenar. */
+  const categories = useMemo(() => {
+    const map = new Map();
+    perawi.forEach((p) => {
+      if (p.kategori) {
+        if (!map.has(p.kategori)) map.set(p.kategori, { color: categoryColor(p.kategori), count: 0 });
+        map.get(p.kategori).count += 1;
+      }
+    });
+    return Array.from(map.entries());
+  }, [perawi]);
 
   const getChildren = useCallback(
     (id) =>
@@ -262,6 +315,15 @@ export default function PokokSanadApp() {
         </div>
       </header>
 
+      <div className="quote-block">
+        <p className="quote-ayat">
+          «ثُمَّ أَوْرَثْنَا الْكِتَابَ الَّذِينَ اصْطَفَيْنَا مِنْ عِبَادِنَا» — سورة فاطر: ٣٢
+        </p>
+        <p className="quote-hadith">
+          «الإسناد من الدين، ولولا الإسناد لقال من شاء ما شاء»
+        </p>
+      </div>
+
       <div className="disclaimer">
         Data contoh dalam aplikasi ini adalah untuk demonstrasi antara muka sahaja. Sila semak &amp; gantikan
         dengan sumber sanad yang muktabar (cth. <em>Ghayah al-Nihayah</em>, <em>al-Nashr fi al-Qiraat al-'Ashr</em>)
@@ -330,6 +392,13 @@ export default function PokokSanadApp() {
         </div>
 
         <div className="tool-group actions-group">
+          <button
+            className={`btn-secondary${showLegend ? " active" : ""}`}
+            onClick={() => setShowLegend((v) => !v)}
+            title="Papar/sembunyi petunjuk warna kategori"
+          >
+            <Palette size={15} /> Petunjuk
+          </button>
           <button className="btn-secondary" onClick={handleAddSelf} title="Tambah nama anda dan sambungkan ke guru anda">
             <User size={15} /> Diri Anda
           </button>
@@ -341,6 +410,24 @@ export default function PokokSanadApp() {
           </button>
         </div>
       </div>
+
+      {showLegend && (
+        <div className="legend-bar">
+          {categories.length === 0 ? (
+            <span className="muted">
+              Belum ada kategori ditambah. Isi medan "Kategori" bila tambah/sunting perawi
+              (cth. nama negara atau kumpulan qiraat) untuk ia dipaparkan di sini dengan warna automatik.
+            </span>
+          ) : (
+            categories.map(([name, info]) => (
+              <span className="legend-chip" key={name}>
+                <span className="legend-dot" style={{ background: info.color }} />
+                {name} ({info.count})
+              </span>
+            ))
+          )}
+        </div>
+      )}
 
       <div className="main-area">
         <div className="tree-canvas">
@@ -356,6 +443,7 @@ export default function PokokSanadApp() {
               selectedId={selectedId}
               direction={direction}
               visited={new Set()}
+              distanceMap={distanceMap}
             />
           ) : (
             <div className="empty-state">Tiada perawi lagi. Tambah perawi pertama untuk mula.</div>
@@ -373,6 +461,23 @@ export default function PokokSanadApp() {
               <span className="badge">{selected.tabaqat}</span>
               {selected.wafat && <span className="wafat">w. {selected.wafat}H</span>}
             </div>
+
+            <div className="depth-box">
+              {selected.id in distanceMap ? (
+                <>
+                  <span className="depth-number">{distanceMap[selected.id]}</span>
+                  <span className="depth-label">
+                    peringkat sanad daripada Rasulullah ﷺ
+                    {distanceMap[selected.id] === 0 ? " (ini Rasulullah ﷺ)" : ""}
+                  </span>
+                </>
+              ) : (
+                <span className="depth-label depth-missing">
+                  Belum bersambung ke Rasulullah ﷺ — masih ada jurang rekod guru.
+                </span>
+              )}
+            </div>
+
             {selected.catatan && <p className="detail-note">{selected.catatan}</p>}
 
             <div className="detail-actions">
@@ -443,6 +548,12 @@ export default function PokokSanadApp() {
         />
       )}
 
+      <footer className="app-footer">
+        <span>Disediakan oleh: <em>— isi nama/institusi anda —</em></span>
+        <span>Sumber: <em>— isi rujukan sumber anda —</em></span>
+        <span>Hak cipta terpelihara</span>
+      </footer>
+
       <style>{CSS}</style>
     </Shell>
   );
@@ -451,7 +562,7 @@ export default function PokokSanadApp() {
 /* ---------------------------------------------------------
    TREE NODE (recursive, top-down "family tree")
 --------------------------------------------------------- */
-function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSelect, onDrill, selectedId, direction, visited }) {
+function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSelect, onDrill, selectedId, direction, visited, distanceMap }) {
   const p = perawiMap[id];
   if (!p) return null;
   visited.add(id);
@@ -459,11 +570,13 @@ function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSel
   const isCollapsed = collapsed.has(id);
   const isSelected = selectedId === id;
   const isProphet = p.tabaqat === "Rasulullah ﷺ";
+  const catColor = categoryColor(p.kategori);
 
   return (
     <div className="tree-node-wrap">
       <div
         className={`node-card${isSelected ? " selected" : ""}${isProphet ? " node-prophet" : ""}`}
+        style={catColor ? { borderLeftColor: catColor, borderLeftWidth: "5px" } : undefined}
         onClick={() => onSelect(id)}
         onDoubleClick={() => onDrill(id)}
       >
@@ -480,7 +593,15 @@ function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSel
         <div className="node-meta">
           <span className="badge">{p.tabaqat}</span>
           {p.wafat && <span className="wafat">w. {p.wafat}H</span>}
+          {id in distanceMap && (
+            <span className="peringkat-chip" title="Peringkat sanad daripada Rasulullah ﷺ">
+              #{distanceMap[id]}
+            </span>
+          )}
         </div>
+        {p.kategori && (
+          <div className="kategori-chip" style={{ background: catColor }}>{p.kategori}</div>
+        )}
       </div>
 
       {direction === "naik" && children.length === 0 && (
@@ -497,6 +618,7 @@ function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSel
               const alreadyShown = visited.has(child.id);
               return (
                 <div className="child-branch" key={edge.id}>
+                  <div className={`connector-arrow ${direction === "naik" ? "arrow-up" : "arrow-down"}`} />
                   {edge.riwayat && edge.riwayat !== "Umum" && (
                     <div className="edge-chip">{edge.riwayat}</div>
                   )}
@@ -521,6 +643,7 @@ function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSel
                       selectedId={selectedId}
                       direction={direction}
                       visited={visited}
+                      distanceMap={distanceMap}
                     />
                   )}
                 </div>
@@ -543,6 +666,7 @@ function PerawiModal({ initial, onClose, onSave }) {
     gelaran: "",
     tabaqat: TABAQAT[2],
     wafat: "",
+    kategori: "",
     catatan: "",
     ...(initial || {}),
   });
@@ -564,6 +688,9 @@ function PerawiModal({ initial, onClose, onSave }) {
         </label>
         <label>Gelaran
           <input value={form.gelaran} onChange={(e) => set("gelaran", e.target.value)} placeholder="Contoh: Imam Kufah" />
+        </label>
+        <label>Kategori (negara / kumpulan qiraat)
+          <input value={form.kategori} onChange={(e) => set("kategori", e.target.value)} placeholder="Contoh: Mesir, Syam, Kuwait" />
         </label>
         <div className="modal-row">
           <label>Tabaqat
@@ -698,6 +825,15 @@ const CSS = `
 .nav-group button { border:none; background:transparent; color: var(--teal); cursor:pointer; padding:2px 4px; display:flex; }
 .nav-group button:disabled { color: #b9b09a; cursor: not-allowed; }
 .actions-group { margin-left:auto; gap:8px; background:none; border:none; padding:0; }
+.btn-secondary.active { background: var(--teal); color:#fff; }
+.legend-bar { display:flex; flex-wrap:wrap; gap:8px; padding: 0 22px 12px; }
+.legend-chip { display:flex; align-items:center; gap:6px; font-size:11px; background:#fff; border:1px solid var(--line); padding:4px 10px; border-radius:20px; }
+.legend-dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.quote-block { margin: 4px 22px 0; background: var(--teal); color:#fff; border-radius:8px; padding:10px 16px; text-align:center; }
+.quote-ayat { font-family:'Amiri',serif; font-size:15px; margin:0; }
+.quote-hadith { font-family:'Amiri',serif; font-size:12.5px; margin:4px 0 0; color: var(--gold-light); }
+.app-footer { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; padding:12px 22px; border-top:1px solid var(--line); font-size:10.5px; color: var(--ink-soft); }
+.app-footer em { color: var(--teal); font-style:normal; }
 .direction-group { gap:0; padding:3px; }
 .direction-group button { border:none; background:transparent; color: var(--ink-soft); font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; cursor:pointer; }
 .direction-group button.dir-active { background: var(--teal); color:#fff; }
@@ -722,6 +858,10 @@ const CSS = `
 .node-card::before { content:''; position:absolute; inset: 3px; border: 1px solid var(--gold-light); border-radius: 7px; pointer-events:none; }
 .node-card.selected { border-color: var(--maroon); box-shadow: 0 0 0 3px rgba(122,46,46,0.15); }
 .node-card.node-prophet { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,106,0.25); }
+.kategori-chip { margin-top:5px; font-size:8.5px; color:#fff; padding:2px 7px; border-radius:20px; display:inline-block; font-weight:600; letter-spacing:0.2px; }
+.connector-arrow { position:absolute; top:14px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; z-index:1; }
+.connector-arrow.arrow-down { border-top:6px solid var(--line); }
+.connector-arrow.arrow-up { border-bottom:6px solid var(--line); top:2px; }
 .node-card.node-ref { border-style: dashed; background: var(--parchment-deep); opacity: 0.85; box-shadow: none; padding-bottom: 8px; }
 .node-card.node-ref::before { border-style: dashed; }
 .ref-caption { font-size: 9px; color: var(--teal); font-style: italic; margin-top: 3px; }
@@ -733,6 +873,7 @@ const CSS = `
 .node-meta { margin-top:5px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
 .badge { font-size: 9.5px; background: rgba(31,75,67,0.12); color: var(--teal); padding:2px 6px; border-radius: 20px; }
 .wafat { font-size: 9.5px; font-family:'IBM Plex Mono',monospace; color: var(--ink-soft); }
+.peringkat-chip { font-size: 9px; font-family:'IBM Plex Mono',monospace; background: var(--gold); color:#fff; padding:2px 6px; border-radius: 20px; font-weight:600; }
 
 .connector-stub { width:1px; height:22px; background: var(--line); }
 .children-row { display:flex; }
@@ -750,6 +891,10 @@ const CSS = `
 .detail-head button { border:none; background:none; cursor:pointer; color: var(--ink-soft); }
 .detail-rumi { font-size:12px; color: var(--ink-soft); margin:4px 0 8px; }
 .detail-badges { display:flex; gap:6px; margin-bottom:10px; }
+.depth-box { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--gold); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+.depth-number { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:700; color: var(--gold); line-height:1; }
+.depth-label { font-size:11px; color: var(--ink-soft); line-height:1.3; }
+.depth-missing { color: var(--maroon); }
 .detail-note { font-size:12px; background:#fff; padding:8px; border-radius:6px; border:1px solid var(--line); }
 .detail-actions { display:flex; flex-direction:column; gap:6px; margin: 12px 0; }
 .detail-actions button { display:flex; align-items:center; gap:6px; border:1px solid var(--teal); color:var(--teal); background:#fff; border-radius:6px; padding:7px 10px; font-size:12px; cursor:pointer; }
