@@ -353,6 +353,7 @@ export default function PokokSanadApp() {
               onDrill={drillInto}
               selectedId={selectedId}
               direction={direction}
+              visited={new Set()}
             />
           ) : (
             <div className="empty-state">Tiada perawi lagi. Tambah perawi pertama untuk mula.</div>
@@ -448,9 +449,10 @@ export default function PokokSanadApp() {
 /* ---------------------------------------------------------
    TREE NODE (recursive, top-down "family tree")
 --------------------------------------------------------- */
-function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSelect, onDrill, selectedId, direction }) {
+function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSelect, onDrill, selectedId, direction, visited }) {
   const p = perawiMap[id];
   if (!p) return null;
+  visited.add(id);
   const children = getChildren(id);
   const isCollapsed = collapsed.has(id);
   const isSelected = selectedId === id;
@@ -489,24 +491,39 @@ function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSel
         <>
           <div className="connector-stub" />
           <div className="children-row">
-            {children.map(({ edge, child }) => (
-              <div className="child-branch" key={edge.id}>
-                {edge.riwayat && edge.riwayat !== "Umum" && (
-                  <div className="edge-chip">{edge.riwayat}</div>
-                )}
-                <TreeNode
-                  id={child.id}
-                  perawiMap={perawiMap}
-                  getChildren={getChildren}
-                  collapsed={collapsed}
-                  toggleCollapse={toggleCollapse}
-                  onSelect={onSelect}
-                  onDrill={onDrill}
-                  selectedId={selectedId}
-                  direction={direction}
-                />
-              </div>
-            ))}
+            {children.map(({ edge, child }) => {
+              const alreadyShown = visited.has(child.id);
+              return (
+                <div className="child-branch" key={edge.id}>
+                  {edge.riwayat && edge.riwayat !== "Umum" && (
+                    <div className="edge-chip">{edge.riwayat}</div>
+                  )}
+                  {alreadyShown ? (
+                    <div
+                      className="node-card node-ref"
+                      onClick={() => onSelect(child.id)}
+                    >
+                      <div className="node-arab">{child.nama_arab}</div>
+                      <div className="node-rumi">{child.nama_rumi}</div>
+                      <div className="ref-caption">↳ rujuk di atas</div>
+                    </div>
+                  ) : (
+                    <TreeNode
+                      id={child.id}
+                      perawiMap={perawiMap}
+                      getChildren={getChildren}
+                      collapsed={collapsed}
+                      toggleCollapse={toggleCollapse}
+                      onSelect={onSelect}
+                      onDrill={onDrill}
+                      selectedId={selectedId}
+                      direction={direction}
+                      visited={visited}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
@@ -703,6 +720,9 @@ const CSS = `
 .node-card::before { content:''; position:absolute; inset: 3px; border: 1px solid var(--gold-light); border-radius: 7px; pointer-events:none; }
 .node-card.selected { border-color: var(--maroon); box-shadow: 0 0 0 3px rgba(122,46,46,0.15); }
 .node-card.node-prophet { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,106,0.25); }
+.node-card.node-ref { border-style: dashed; background: var(--parchment-deep); opacity: 0.85; box-shadow: none; padding-bottom: 8px; }
+.node-card.node-ref::before { border-style: dashed; }
+.ref-caption { font-size: 9px; color: var(--teal); font-style: italic; margin-top: 3px; }
 .chain-end { margin-top:8px; font-size:10.5px; color: var(--ink-soft); background: rgba(0,0,0,0.04); padding:4px 10px; border-radius:20px; }
 .chain-end-success { color: var(--teal); background: rgba(31,75,67,0.12); font-weight:600; }
 .collapse-btn { position:absolute; bottom:-11px; left:50%; transform:translateX(-50%); background:var(--teal); color:#fff; border:none; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; }
