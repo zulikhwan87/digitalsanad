@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import {
-  Plus, Trash2, X, ChevronDown, ChevronRight, GitBranch,
+  Plus, Trash2, X, GitBranch,
   Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette
 } from "lucide-react";
 
@@ -12,10 +12,12 @@ import {
 
 const TABAQAT = [
   "Rasulullah ﷺ",
+  "Malaikat",
   "Sahabat",
   "Tabi'in",
   "Tabi' Tabi'in",
   "Imam Qiraat",
+  "Turuq (Syatibiyyah/Tayyibah)",
   "Ulama Kemudian",
 ];
 
@@ -32,6 +34,7 @@ function categoryColor(name) {
 }
 
 const SEED_PERAWI = [
+  { id: "p_jibril", nama_arab: "جِبْرِيل عَلَيْهِ السَّلَام", nama_rumi: "Jibril a.s.", gelaran: "", tabaqat: "Malaikat", wafat: "", catatan: "Menyampaikan wahyu al-Quran kepada Nabi Muhammad ﷺ." },
   { id: "p_nabi", nama_arab: "مُحَمَّد رَسُوْل اللّٰه ﷺ", nama_rumi: "Nabi Muhammad ﷺ", gelaran: "", tabaqat: "Rasulullah ﷺ", wafat: "11", catatan: "Menerima al-Quran daripada Malaikat Jibril a.s." },
   { id: "p_uthman", nama_arab: "عُثْمَان بْن عَفَّان", nama_rumi: "Uthman bin Affan", gelaran: "Khalifah ke-3", tabaqat: "Sahabat", wafat: "35", catatan: "" },
   { id: "p_ali", nama_arab: "عَلِيّ بْن أَبِي طَالِب", nama_rumi: "Ali bin Abi Talib", gelaran: "Khalifah ke-4", tabaqat: "Sahabat", wafat: "40", catatan: "" },
@@ -42,9 +45,15 @@ const SEED_PERAWI = [
   { id: "p_hafs", nama_arab: "حَفْص بْن سُلَيْمَان", nama_rumi: "Hafs bin Sulaiman", gelaran: "", tabaqat: "Imam Qiraat", wafat: "180", kategori: "Iraq", catatan: "Riwayat yang paling meluas digunakan hari ini." },
   { id: "p_nafi", nama_arab: "نَافِع بْن عَبْد الرَّحْمَن", nama_rumi: "Nafi' bin Abd al-Rahman", gelaran: "Imam Madinah", tabaqat: "Imam Qiraat", wafat: "169", kategori: "Madinah", catatan: "" },
   { id: "p_warsh", nama_arab: "عُثْمَان بْن سَعِيد الوَرْش", nama_rumi: "Warsh (Uthman bin Sa'id)", gelaran: "", tabaqat: "Imam Qiraat", wafat: "197", kategori: "Mesir", catatan: "" },
+  { id: "p_syatibiyyah", nama_arab: "طَرِيق الشَّاطِبِيَّة", nama_rumi: "Tariq al-Syatibiyyah", gelaran: "", tabaqat: "Turuq (Syatibiyyah/Tayyibah)", wafat: "", catatan: "Jalur sanad merujuk kepada nazam Hirz al-Amani (asy-Syatibiyyah) oleh Imam asy-Syatibi — meliputi Qiraat Tujuh." },
+  { id: "p_tayyibah", nama_arab: "طَرِيق الطَّيِّبَة", nama_rumi: "Tariq al-Tayyibah", gelaran: "", tabaqat: "Turuq (Syatibiyyah/Tayyibah)", wafat: "", catatan: "Jalur sanad merujuk kepada Tayyibat al-Nasyr oleh Imam Ibn al-Jazari — meliputi Qiraat Sepuluh." },
+  { id: "p_qari_mesir", nama_arab: "قَارِئ مِصْرِيّ (مِثَال)", nama_rumi: "Contoh Qari Mesir", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Mesir", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
+  { id: "p_qari_syam", nama_arab: "قَارِئ شَامِيّ (مِثَال)", nama_rumi: "Contoh Qari Syam", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Syam", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
+  { id: "p_qari_kuwait", nama_arab: "قَارِئ كُوَيْتِيّ (مِثَال)", nama_rumi: "Contoh Qari Kuwait", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Kuwait", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
 ];
 
 const SEED_SANAD = [
+  { id: uid("s"), guru_id: "p_jibril", murid_id: "p_nabi", riwayat: "Umum", catatan: "" },
   { id: uid("s"), guru_id: "p_nabi", murid_id: "p_uthman", riwayat: "Umum", catatan: "" },
   { id: uid("s"), guru_id: "p_nabi", murid_id: "p_ali", riwayat: "Umum", catatan: "" },
   { id: uid("s"), guru_id: "p_nabi", murid_id: "p_zaid", riwayat: "Umum", catatan: "" },
@@ -57,6 +66,12 @@ const SEED_SANAD = [
   { id: uid("s"), guru_id: "p_asim", murid_id: "p_hafs", riwayat: "Hafs 'an 'Asim", catatan: "" },
   { id: uid("s"), guru_id: "p_sulami", murid_id: "p_nafi", riwayat: "Warsh 'an Nafi'", catatan: "" },
   { id: uid("s"), guru_id: "p_nafi", murid_id: "p_warsh", riwayat: "Warsh 'an Nafi'", catatan: "" },
+  { id: uid("s"), guru_id: "p_hafs", murid_id: "p_syatibiyyah", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_warsh", murid_id: "p_syatibiyyah", riwayat: "Warsh 'an Nafi'", catatan: "" },
+  { id: uid("s"), guru_id: "p_hafs", murid_id: "p_tayyibah", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_syatibiyyah", murid_id: "p_qari_mesir", riwayat: "Warsh 'an Nafi'", catatan: "" },
+  { id: uid("s"), guru_id: "p_syatibiyyah", murid_id: "p_qari_syam", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_tayyibah", murid_id: "p_qari_kuwait", riwayat: "Hafs 'an 'Asim", catatan: "" },
 ];
 
 const STORAGE_KEY = "pokok-sanad-data-v1";
@@ -72,7 +87,6 @@ export default function PokokSanadApp() {
   const [riwayatFilter, setRiwayatFilter] = useState("Semua");
   const [direction, setDirection] = useState("turun"); // "turun" = ke murid, "naik" = ke guru
   const [addingSelf, setAddingSelf] = useState(false);
-  const [collapsed, setCollapsed] = useState(new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
 
@@ -174,42 +188,6 @@ export default function PokokSanadApp() {
     });
     return Array.from(map.entries());
   }, [perawi]);
-
-  const getChildren = useCallback(
-    (id) =>
-      sanad
-        .filter(
-          (e) =>
-            e.guru_id === id &&
-            (riwayatFilter === "Semua" || e.riwayat === riwayatFilter) &&
-            perawiMap[e.murid_id]
-        )
-        .map((e) => ({ edge: e, child: perawiMap[e.murid_id] })),
-    [sanad, riwayatFilter, perawiMap]
-  );
-
-  const getParents = useCallback(
-    (id) =>
-      sanad
-        .filter(
-          (e) =>
-            e.murid_id === id &&
-            (riwayatFilter === "Semua" || e.riwayat === riwayatFilter) &&
-            perawiMap[e.guru_id]
-        )
-        .map((e) => ({ edge: e, child: perawiMap[e.guru_id] })),
-    [sanad, riwayatFilter, perawiMap]
-  );
-
-  const activeGetChildren = direction === "turun" ? getChildren : getParents;
-
-  const toggleCollapse = (id) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
 
   const drillInto = (id) => {
     if (id === rootId) return;
@@ -430,25 +408,17 @@ export default function PokokSanadApp() {
       )}
 
       <div className="main-area">
-        <div className="tree-canvas">
-          {rootId && perawiMap[rootId] ? (
-            <TreeNode
-              id={rootId}
-              perawiMap={perawiMap}
-              getChildren={activeGetChildren}
-              collapsed={collapsed}
-              toggleCollapse={toggleCollapse}
-              onSelect={setSelectedId}
-              onDrill={drillInto}
-              selectedId={selectedId}
-              direction={direction}
-              visited={new Set()}
-              distanceMap={distanceMap}
-            />
-          ) : (
-            <div className="empty-state">Tiada perawi lagi. Tambah perawi pertama untuk mula.</div>
-          )}
-        </div>
+        <SanadGraph
+          rootId={rootId}
+          perawiMap={perawiMap}
+          sanad={sanad}
+          riwayatFilter={riwayatFilter}
+          direction={direction}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onDrill={drillInto}
+          distanceMap={distanceMap}
+        />
 
         {selected && (
           <aside className="detail-panel">
@@ -560,98 +530,190 @@ export default function PokokSanadApp() {
 }
 
 /* ---------------------------------------------------------
-   TREE NODE (recursive, top-down "family tree")
+   SANAD GRAPH — susunan berperingkat (generasi demi generasi)
+   dengan panah SVG sebenar. Setiap perawi dipaparkan SEKALI
+   sahaja walaupun ada banyak guru/murid berhubung dengannya;
+   semua sambungan dilukis sebagai anak panah berasingan ke/dari
+   nod yang sama (bukan kad diulang seperti sebelum ini).
 --------------------------------------------------------- */
-function TreeNode({ id, perawiMap, getChildren, collapsed, toggleCollapse, onSelect, onDrill, selectedId, direction, visited, distanceMap }) {
-  const p = perawiMap[id];
-  if (!p) return null;
-  visited.add(id);
-  const children = getChildren(id);
-  const isCollapsed = collapsed.has(id);
-  const isSelected = selectedId === id;
-  const isProphet = p.tabaqat === "Rasulullah ﷺ";
-  const catColor = categoryColor(p.kategori);
+function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, selectedId, onSelect, onDrill, distanceMap }) {
+  const canvasRef = useRef(null);
+  const nodeRefs = useRef({});
+  const [positions, setPositions] = useState({});
+
+  const adjacency = useMemo(() => {
+    const fwd = {};
+    const bwd = {};
+    sanad.forEach((e) => {
+      if (riwayatFilter !== "Semua" && e.riwayat !== riwayatFilter) return;
+      if (!perawiMap[e.guru_id] || !perawiMap[e.murid_id]) return;
+      if (!fwd[e.guru_id]) fwd[e.guru_id] = [];
+      fwd[e.guru_id].push(e);
+      if (!bwd[e.murid_id]) bwd[e.murid_id] = [];
+      bwd[e.murid_id].push(e);
+    });
+    return { fwd, bwd };
+  }, [sanad, perawiMap, riwayatFilter]);
+
+  const { levelOf, order } = useMemo(() => {
+    const levelOf = {};
+    const order = [];
+    if (!rootId || !perawiMap[rootId]) return { levelOf, order };
+    levelOf[rootId] = 0;
+    order[0] = [rootId];
+    const adj = direction === "turun" ? adjacency.fwd : adjacency.bwd;
+    const nextKey = direction === "turun" ? "murid_id" : "guru_id";
+    const queue = [rootId];
+    let qi = 0;
+    while (qi < queue.length) {
+      const cur = queue[qi++];
+      (adj[cur] || []).forEach((e) => {
+        const nid = e[nextKey];
+        if (!(nid in levelOf)) {
+          levelOf[nid] = levelOf[cur] + 1;
+          if (!order[levelOf[nid]]) order[levelOf[nid]] = [];
+          order[levelOf[nid]].push(nid);
+          queue.push(nid);
+        }
+      });
+    }
+    return { levelOf, order };
+  }, [rootId, perawiMap, adjacency, direction]);
+
+  const edgesToDraw = useMemo(
+    () =>
+      sanad.filter(
+        (e) =>
+          (riwayatFilter === "Semua" || e.riwayat === riwayatFilter) &&
+          e.guru_id in levelOf &&
+          e.murid_id in levelOf
+      ),
+    [sanad, riwayatFilter, levelOf]
+  );
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const canvasEl = canvasRef.current;
+      if (!canvasEl) return;
+      const canvasRect = canvasEl.getBoundingClientRect();
+      const pos = {};
+      Object.entries(nodeRefs.current).forEach(([id, el]) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        pos[id] = { x: r.left - canvasRect.left, y: r.top - canvasRect.top, w: r.width, h: r.height };
+      });
+      setPositions(pos);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (canvasRef.current) ro.observe(canvasRef.current);
+    window.addEventListener("resize", measure);
+    const t = setTimeout(measure, 150);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      clearTimeout(t);
+    };
+  }, [order, edgesToDraw.length]);
+
+  const edgePaths = useMemo(() => {
+    return edgesToDraw
+      .map((e) => {
+        const g = positions[e.guru_id];
+        const m = positions[e.murid_id];
+        if (!g || !m) return null;
+        const gx = g.x + g.w / 2;
+        const mx = m.x + m.w / 2;
+        let y1, y2;
+        if (g.y <= m.y) {
+          y1 = g.y + g.h;
+          y2 = m.y;
+        } else {
+          y1 = g.y;
+          y2 = m.y + m.h;
+        }
+        const midY = (y1 + y2) / 2;
+        return {
+          id: e.id,
+          d: `M ${gx} ${y1} C ${gx} ${midY}, ${mx} ${midY}, ${mx} ${y2}`,
+          labelX: (gx + mx) / 2,
+          labelY: midY,
+          riwayat: e.riwayat,
+        };
+      })
+      .filter(Boolean);
+  }, [edgesToDraw, positions]);
+
+  if (!rootId || !perawiMap[rootId]) {
+    return <div className="empty-state">Tiada perawi lagi. Tambah perawi pertama untuk mula.</div>;
+  }
 
   return (
-    <div className="tree-node-wrap">
-      <div
-        className={`node-card${isSelected ? " selected" : ""}${isProphet ? " node-prophet" : ""}`}
-        style={catColor ? { borderLeftColor: catColor, borderLeftWidth: "5px" } : undefined}
-        onClick={() => onSelect(id)}
-        onDoubleClick={() => onDrill(id)}
-      >
-        {children.length > 0 && (
-          <button
-            className="collapse-btn"
-            onClick={(e) => { e.stopPropagation(); toggleCollapse(id); }}
-          >
-            {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-          </button>
-        )}
-        <div className="node-arab">{p.nama_arab}</div>
-        <div className="node-rumi">{p.nama_rumi}</div>
-        <div className="node-meta">
-          <span className="badge">{p.tabaqat}</span>
-          {p.wafat && <span className="wafat">w. {p.wafat}H</span>}
-          {id in distanceMap && (
-            <span className="peringkat-chip" title="Peringkat sanad daripada Rasulullah ﷺ">
-              #{distanceMap[id]}
-            </span>
-          )}
-        </div>
-        {p.kategori && (
-          <div className="kategori-chip" style={{ background: catColor }}>{p.kategori}</div>
-        )}
-      </div>
+    <div className="graph-scroll">
+      <div className="graph-content" ref={canvasRef}>
+        <svg className="graph-svg">
+          <defs>
+            <marker id="sanad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" className="arrow-head" />
+            </marker>
+          </defs>
+          {edgePaths.map((p) => (
+            <path key={p.id} d={p.d} className="graph-edge" markerEnd="url(#sanad-arrow)" />
+          ))}
+        </svg>
 
-      {direction === "naik" && children.length === 0 && (
-        <div className={`chain-end${isProphet ? " chain-end-success" : ""}`}>
-          {isProphet ? "✓ Sampai kepada Rasulullah ﷺ" : "— tiada rekod guru selanjutnya —"}
-        </div>
-      )}
+        {edgePaths.map(
+          (p) =>
+            p.riwayat &&
+            p.riwayat !== "Umum" && (
+              <div key={`lbl-${p.id}`} className="edge-chip graph-edge-label" style={{ left: p.labelX, top: p.labelY }}>
+                {p.riwayat}
+              </div>
+            )
+        )}
 
-      {!isCollapsed && children.length > 0 && (
-        <>
-          <div className="connector-stub" />
-          <div className="children-row">
-            {children.map(({ edge, child }) => {
-              const alreadyShown = visited.has(child.id);
+        {order.map((ids, lvl) => (
+          <div className="graph-level" key={lvl}>
+            {ids.map((id) => {
+              const p = perawiMap[id];
+              if (!p) return null;
+              const isSelected = selectedId === id;
+              const isProphet = p.tabaqat === "Rasulullah ﷺ";
+              const catColor = categoryColor(p.kategori);
+              const hasNext = (direction === "turun" ? adjacency.fwd[id] : adjacency.bwd[id]) || [];
+              const isChainEnd = direction === "naik" && hasNext.length === 0;
               return (
-                <div className="child-branch" key={edge.id}>
-                  <div className={`connector-arrow ${direction === "naik" ? "arrow-up" : "arrow-down"}`} />
-                  {edge.riwayat && edge.riwayat !== "Umum" && (
-                    <div className="edge-chip">{edge.riwayat}</div>
-                  )}
-                  {alreadyShown ? (
-                    <div
-                      className="node-card node-ref"
-                      onClick={() => onSelect(child.id)}
-                    >
-                      <div className="node-arab">{child.nama_arab}</div>
-                      <div className="node-rumi">{child.nama_rumi}</div>
-                      <div className="ref-caption">↳ rujuk di atas</div>
+                <div className="graph-node-slot" key={id} ref={(el) => (nodeRefs.current[id] = el)}>
+                  <div
+                    className={`node-card${isSelected ? " selected" : ""}${isProphet ? " node-prophet" : ""}`}
+                    style={catColor ? { borderLeftColor: catColor, borderLeftWidth: "5px" } : undefined}
+                    onClick={() => onSelect(id)}
+                    onDoubleClick={() => onDrill(id)}
+                  >
+                    <div className="node-arab">{p.nama_arab}</div>
+                    <div className="node-rumi">{p.nama_rumi}</div>
+                    <div className="node-meta">
+                      <span className="badge">{p.tabaqat}</span>
+                      {p.wafat && <span className="wafat">w. {p.wafat}H</span>}
+                      {id in distanceMap && (
+                        <span className="peringkat-chip" title="Peringkat sanad daripada Rasulullah ﷺ">
+                          #{distanceMap[id]}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <TreeNode
-                      id={child.id}
-                      perawiMap={perawiMap}
-                      getChildren={getChildren}
-                      collapsed={collapsed}
-                      toggleCollapse={toggleCollapse}
-                      onSelect={onSelect}
-                      onDrill={onDrill}
-                      selectedId={selectedId}
-                      direction={direction}
-                      visited={visited}
-                      distanceMap={distanceMap}
-                    />
+                    {p.kategori && <div className="kategori-chip" style={{ background: catColor }}>{p.kategori}</div>}
+                  </div>
+                  {isChainEnd && (
+                    <div className={`chain-end${isProphet ? " chain-end-success" : ""}`}>
+                      {isProphet ? "✓ Sampai kepada Rasulullah ﷺ" : "— tiada rekod guru selanjutnya —"}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
@@ -850,8 +912,16 @@ const CSS = `
 .sr-rumi { font-size:11px; color: var(--ink-soft); }
 
 .main-area { flex:1; display:flex; overflow:auto; }
-.tree-canvas { flex:1; overflow:auto; padding: 40px 30px 60px; display:flex; justify-content:center; }
-.empty-state { color: var(--ink-soft); padding: 60px; }
+.empty-state { color: var(--ink-soft); padding: 60px; flex:1; }
+
+.graph-scroll { flex:1; overflow:auto; }
+.graph-content { position:relative; min-width:100%; width:max-content; padding: 50px 60px 70px; }
+.graph-svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.graph-edge { fill:none; stroke: var(--line); stroke-width:1.6; }
+.arrow-head { fill: var(--line); }
+.graph-level { display:flex; justify-content:center; gap:36px; margin-bottom:60px; position:relative; z-index:1; }
+.graph-node-slot { display:flex; flex-direction:column; align-items:center; }
+.graph-edge-label { position:absolute; transform:translate(-50%,-50%); z-index:2; pointer-events:none; }
 
 .tree-node-wrap { display:flex; flex-direction:column; align-items:center; }
 .node-card { position:relative; background: #fff; border: 1.5px solid var(--teal); border-radius: 10px; padding: 10px 16px 8px; min-width: 150px; max-width: 190px; text-align:center; cursor:pointer; box-shadow: 0 2px 0 var(--gold-light); }
