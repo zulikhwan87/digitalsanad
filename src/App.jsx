@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import {
   Plus, Trash2, X, GitBranch,
-  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette
+  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -19,6 +19,8 @@ const TABAQAT = [
   "Imam Qiraat",
   "Turuq (Syatibiyyah/Tayyibah)",
   "Ulama Kemudian",
+  "Ulama",
+  "Ulama Semasa",
 ];
 
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
@@ -95,6 +97,8 @@ export default function PokokSanadApp() {
   const [showAddSanad, setShowAddSanad] = useState(false);
   const [sanadPrefill, setSanadPrefill] = useState(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [showRanking, setShowRanking] = useState(false);
+  const [rankingTabaqat, setRankingTabaqat] = useState("Semua");
 
   /* ---------- load (localStorage) ---------- */
   useEffect(() => {
@@ -188,6 +192,17 @@ export default function PokokSanadApp() {
     });
     return Array.from(map.entries());
   }, [perawi]);
+
+  /* Senarai kedudukan sanad — semua perawi yang bersambung ke Rasulullah ﷺ,
+     disusun daripada peringkat terendah (sanad tertinggi/terdekat) ke tertinggi
+     (sanad terpanjang), supaya mudah dibandingkan. */
+  const rankingList = useMemo(() => {
+    return perawi
+      .filter((p) => p.id in distanceMap)
+      .filter((p) => rankingTabaqat === "Semua" || p.tabaqat === rankingTabaqat)
+      .map((p) => ({ ...p, peringkat: distanceMap[p.id] }))
+      .sort((a, b) => a.peringkat - b.peringkat || a.nama_rumi.localeCompare(b.nama_rumi));
+  }, [perawi, distanceMap, rankingTabaqat]);
 
   const drillInto = (id) => {
     if (id === rootId) return;
@@ -377,6 +392,12 @@ export default function PokokSanadApp() {
           >
             <Palette size={15} /> Petunjuk
           </button>
+          <button className="btn-secondary" onClick={() => setShowRanking(true)} title="Bandingkan kedudukan sanad semua perawi">
+            <ListOrdered size={15} /> Kedudukan Sanad
+          </button>
+          <button className="btn-secondary" onClick={() => window.print()} title="Jana PDF / cetak keseluruhan sanad">
+            <Printer size={15} /> Jana PDF
+          </button>
           <button className="btn-secondary" onClick={handleAddSelf} title="Tambah nama anda dan sambungkan ke guru anda">
             <User size={15} /> Diri Anda
           </button>
@@ -389,8 +410,8 @@ export default function PokokSanadApp() {
         </div>
       </div>
 
-      {showLegend && (
-        <div className="legend-bar">
+      {(showLegend || categories.length > 0) && (
+        <div className={`legend-bar${showLegend ? "" : " legend-hidden"}`}>
           {categories.length === 0 ? (
             <span className="muted">
               Belum ada kategori ditambah. Isi medan "Kategori" bila tambah/sunting perawi
@@ -515,6 +536,16 @@ export default function PokokSanadApp() {
           prefill={sanadPrefill}
           onClose={() => { setShowAddSanad(false); setSanadPrefill(null); }}
           onSave={saveSanad}
+        />
+      )}
+
+      {showRanking && (
+        <RankingModal
+          rankingList={rankingList}
+          rankingTabaqat={rankingTabaqat}
+          setRankingTabaqat={setRankingTabaqat}
+          onClose={() => setShowRanking(false)}
+          onSelect={(id) => { setSelectedId(id); setShowRanking(false); }}
         />
       )}
 
@@ -713,6 +744,49 @@ function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, select
             })}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
+   KEDUDUKAN SANAD — senarai perbandingan peringkat sanad
+   (nombor lebih kecil = sanad lebih tinggi/hampir Rasulullah ﷺ)
+--------------------------------------------------------- */
+function RankingModal({ rankingList, rankingTabaqat, setRankingTabaqat, onClose, onSelect }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Kedudukan Sanad</h3>
+          <button onClick={onClose}><X size={16} /></button>
+        </div>
+        <p className="ranking-note">
+          Nombor lebih kecil = peringkat lebih tinggi (lebih hampir kepada Rasulullah ﷺ, dianggap "sanad tinggi").
+          Nombor lebih besar = "sanad rendah" (lebih banyak peringkat perantaraan).
+        </p>
+        <label>Tapis ikut tabaqat
+          <select value={rankingTabaqat} onChange={(e) => setRankingTabaqat(e.target.value)}>
+            <option value="Semua">Semua</option>
+            {TABAQAT.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <div className="ranking-list">
+          {rankingList.length === 0 ? (
+            <p className="muted">Tiada perawi sepadan (atau belum bersambung ke Rasulullah ﷺ).</p>
+          ) : (
+            rankingList.map((p, i) => (
+              <button className="ranking-row" key={p.id} onClick={() => onSelect(p.id)}>
+                <span className="ranking-index">{i + 1}</span>
+                <span className="ranking-name">
+                  <span className="ranking-arab">{p.nama_arab}</span>
+                  <span className="ranking-rumi">{p.nama_rumi}{p.kategori ? ` · ${p.kategori}` : ""}</span>
+                </span>
+                <span className="ranking-peringkat">#{p.peringkat}</span>
+              </button>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
@@ -988,4 +1062,29 @@ const CSS = `
 .modal-row { display:flex; gap:10px; }
 .modal-row label { flex:1; }
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+
+.modal-wide { width: 460px; }
+.ranking-note { font-size:11px; color: var(--ink-soft); background: rgba(184,134,46,0.12); border:1px solid var(--gold-light); border-radius:6px; padding:8px 10px; margin:0; }
+.ranking-list { display:flex; flex-direction:column; gap:6px; max-height: 360px; overflow-y:auto; margin-top:4px; }
+.ranking-row { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px; cursor:pointer; text-align:left; font-family:'Work Sans',sans-serif; }
+.ranking-row:hover { border-color: var(--teal); }
+.ranking-index { font-family:'IBM Plex Mono',monospace; font-size:11px; color: var(--ink-soft); width:20px; flex-shrink:0; }
+.ranking-name { flex:1; display:flex; flex-direction:column; min-width:0; }
+.ranking-arab { font-family:'Amiri',serif; font-size:13.5px; }
+.ranking-rumi { font-size:10.5px; color: var(--ink-soft); }
+.ranking-peringkat { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:700; background: var(--gold); color:#fff; padding:2px 8px; border-radius:20px; flex-shrink:0; }
+
+.legend-hidden { display:none; }
+
+@media print {
+  @page { size: A3 landscape; margin: 10mm; }
+  body { background:#fff; }
+  .pokok-sanad-shell { overflow: visible !important; border-radius:0 !important; min-height:auto !important; }
+  .toolbar, .save-pill, .disclaimer, .detail-panel, .modal-backdrop { display:none !important; }
+  .legend-bar { display:flex !important; }
+  .main-area { display:block !important; height:auto !important; overflow:visible !important; }
+  .graph-scroll { overflow:visible !important; height:auto !important; flex:none !important; }
+  .graph-content { width:auto !important; min-width:0 !important; }
+  .node-card, .quote-block, .kategori-chip, .peringkat-chip, .badge { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
 `;
