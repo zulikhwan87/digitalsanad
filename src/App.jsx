@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import {
   Plus, Trash2, X, GitBranch,
-  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered, MapPin
+  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered, MapPin, RotateCcw
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -39,6 +39,19 @@ function categoryColor(name) {
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue}, 52%, 42%)`;
+}
+
+const DEFAULT_LINE_COLOR = "#B9A66E";
+
+/* Warna anak panah ikut riwayat/jalur sanad — "Umum" (sambungan generik,
+   belum bercabang ikut riwayat) sentiasa guna warna neutral. */
+function riwayatColor(riwayat) {
+  if (!riwayat || riwayat === "Umum") return DEFAULT_LINE_COLOR;
+  return categoryColor(riwayat);
+}
+
+function slugId(s) {
+  return String(s || "umum").replace(/[^a-zA-Z0-9]/g, "_");
 }
 
 const SEED_PERAWI = [
@@ -112,6 +125,7 @@ export default function PokokSanadApp() {
   const [showRanking, setShowRanking] = useState(false);
   const [rankingTabaqat, setRankingTabaqat] = useState("Semua");
   const [showDirectory, setShowDirectory] = useState(false);
+  const [nodePositionOverrides, setNodePositionOverrides] = useState({});
 
   /* ---------- load (localStorage) ---------- */
   useEffect(() => {
@@ -122,6 +136,7 @@ export default function PokokSanadApp() {
         setPerawi(data.perawi || []);
         setSanad(data.sanad || []);
         setRootId(data.rootId || (data.perawi && data.perawi[0]?.id) || null);
+        setNodePositionOverrides(data.nodePositionOverrides || {});
       } else {
         setPerawi(SEED_PERAWI);
         setSanad(SEED_SANAD);
@@ -144,7 +159,7 @@ export default function PokokSanadApp() {
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ perawi, sanad, rootId })
+          JSON.stringify({ perawi, sanad, rootId, nodePositionOverrides })
         );
         setSaveState("saved");
       } catch {
@@ -152,7 +167,7 @@ export default function PokokSanadApp() {
       }
     }, 500);
     return () => clearTimeout(t);
-  }, [perawi, sanad, rootId, loading]);
+  }, [perawi, sanad, rootId, nodePositionOverrides, loading]);
 
   const perawiMap = useMemo(
     () => Object.fromEntries(perawi.map((p) => [p.id, p])),
@@ -205,6 +220,17 @@ export default function PokokSanadApp() {
     });
     return Array.from(map.entries());
   }, [perawi]);
+
+  /* Petunjuk warna anak panah ikut riwayat/jalur sanad */
+  const riwayatLegend = useMemo(() => {
+    const map = new Map();
+    sanad.forEach((e) => {
+      if (e.riwayat && e.riwayat !== "Umum") {
+        if (!map.has(e.riwayat)) map.set(e.riwayat, categoryColor(e.riwayat));
+      }
+    });
+    return Array.from(map.entries());
+  }, [sanad]);
 
   /* Senarai kedudukan sanad — semua perawi yang bersambung ke Rasulullah ﷺ,
      disusun daripada peringkat terendah (sanad tertinggi/terdekat) ke tertinggi
@@ -441,6 +467,13 @@ export default function PokokSanadApp() {
           <button className="btn-secondary" onClick={() => setShowDirectory(true)} title="Senarai guru al-Quran Malaysia ikut negeri">
             <MapPin size={15} /> Guru Malaysia
           </button>
+          <button
+            className="btn-secondary"
+            onClick={() => setNodePositionOverrides({})}
+            title="Kembalikan semua kad ke susunan automatik (buang seretan manual)"
+          >
+            <RotateCcw size={15} /> Reset Susunan
+          </button>
           <button className="btn-secondary" onClick={() => window.print()} title="Jana PDF / cetak keseluruhan sanad">
             <Printer size={15} /> Jana PDF
           </button>
@@ -456,12 +489,13 @@ export default function PokokSanadApp() {
         </div>
       </div>
 
-      {(showLegend || categories.length > 0) && (
+      {(showLegend || categories.length > 0 || riwayatLegend.length > 0) && (
         <div className={`legend-bar${showLegend ? "" : " legend-hidden"}`}>
+          <span className="legend-label">Kategori:</span>
           {categories.length === 0 ? (
             <span className="muted">
               Belum ada kategori ditambah. Isi medan "Kategori" bila tambah/sunting perawi
-              (cth. nama negara atau kumpulan qiraat) untuk ia dipaparkan di sini dengan warna automatik.
+              (cth. nama negeri, negara, atau kumpulan qiraat) untuk ia dipaparkan di sini dengan warna automatik.
             </span>
           ) : (
             categories.map(([name, info]) => (
@@ -470,6 +504,17 @@ export default function PokokSanadApp() {
                 {name} ({info.count})
               </span>
             ))
+          )}
+          {riwayatLegend.length > 0 && (
+            <>
+              <span className="legend-label legend-label-sep">Riwayat:</span>
+              {riwayatLegend.map(([name, color]) => (
+                <span className="legend-chip" key={name}>
+                  <span className="legend-dot" style={{ background: color }} />
+                  {name}
+                </span>
+              ))}
+            </>
           )}
         </div>
       )}
@@ -485,6 +530,8 @@ export default function PokokSanadApp() {
           onSelect={setSelectedId}
           onDrill={drillInto}
           distanceMap={distanceMap}
+          nodePositionOverrides={nodePositionOverrides}
+          setNodePositionOverrides={setNodePositionOverrides}
         />
 
         {selected && (
@@ -621,10 +668,42 @@ export default function PokokSanadApp() {
    semua sambungan dilukis sebagai anak panah berasingan ke/dari
    nod yang sama (bukan kad diulang seperti sebelum ini).
 --------------------------------------------------------- */
-function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, selectedId, onSelect, onDrill, distanceMap }) {
+function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, selectedId, onSelect, onDrill, distanceMap, nodePositionOverrides, setNodePositionOverrides }) {
   const canvasRef = useRef(null);
   const nodeRefs = useRef({});
   const [positions, setPositions] = useState({});
+  const dragStateRef = useRef(null);
+  const dragMovedRef = useRef(false);
+
+  const handlePointerDown = (e, id) => {
+    e.stopPropagation();
+    const existing = nodePositionOverrides[id] || { dx: 0, dy: 0 };
+    dragStateRef.current = { id, startX: e.clientX, startY: e.clientY, startDx: existing.dx, startDy: existing.dy };
+    dragMovedRef.current = false;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    const ds = dragStateRef.current;
+    if (!ds) return;
+    const dx = e.clientX - ds.startX;
+    const dy = e.clientY - ds.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMovedRef.current = true;
+    if (!dragMovedRef.current) return;
+    setNodePositionOverrides((prev) => ({ ...prev, [ds.id]: { dx: ds.startDx + dx, dy: ds.startDy + dy } }));
+  };
+
+  const handlePointerUp = () => {
+    dragStateRef.current = null;
+  };
+
+  const handleNodeClick = (id) => {
+    if (dragMovedRef.current) {
+      dragMovedRef.current = false;
+      return;
+    }
+    onSelect(id);
+  };
 
   const adjacency = useMemo(() => {
     const fwd = {};
@@ -699,7 +778,7 @@ function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, select
       window.removeEventListener("resize", measure);
       clearTimeout(t);
     };
-  }, [order, edgesToDraw.length]);
+  }, [order, edgesToDraw.length, nodePositionOverrides]);
 
   const edgePaths = useMemo(() => {
     return edgesToDraw
@@ -738,12 +817,29 @@ function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, select
       <div className="graph-content" ref={canvasRef}>
         <svg className="graph-svg">
           <defs>
-            <marker id="sanad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M0,0 L10,5 L0,10 z" className="arrow-head" />
-            </marker>
+            {Array.from(new Set(edgePaths.map((p) => p.riwayat || "Umum"))).map((r) => (
+              <marker
+                key={r}
+                id={`sanad-arrow-${slugId(r)}`}
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M0,0 L10,5 L0,10 z" style={{ fill: riwayatColor(r) }} />
+              </marker>
+            ))}
           </defs>
           {edgePaths.map((p) => (
-            <path key={p.id} d={p.d} className="graph-edge" markerEnd="url(#sanad-arrow)" />
+            <path
+              key={p.id}
+              d={p.d}
+              className="graph-edge"
+              style={{ stroke: riwayatColor(p.riwayat) }}
+              markerEnd={`url(#sanad-arrow-${slugId(p.riwayat || "Umum")})`}
+            />
           ))}
         </svg>
 
@@ -767,12 +863,20 @@ function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, select
               const catColor = categoryColor(p.kategori);
               const hasNext = (direction === "turun" ? adjacency.fwd[id] : adjacency.bwd[id]) || [];
               const isChainEnd = direction === "naik" && hasNext.length === 0;
+              const override = nodePositionOverrides[id];
+              const cardStyle = {
+                ...(catColor ? { borderLeftColor: catColor, borderLeftWidth: "5px" } : {}),
+                ...(override ? { transform: `translate(${override.dx}px, ${override.dy}px)`, zIndex: 5 } : {}),
+              };
               return (
                 <div className="graph-node-slot" key={id} ref={(el) => (nodeRefs.current[id] = el)}>
                   <div
-                    className={`node-card${isSelected ? " selected" : ""}${isProphet ? " node-prophet" : ""}`}
-                    style={catColor ? { borderLeftColor: catColor, borderLeftWidth: "5px" } : undefined}
-                    onClick={() => onSelect(id)}
+                    className={`node-card${isSelected ? " selected" : ""}${isProphet ? " node-prophet" : ""}${override ? " node-dragged" : ""}`}
+                    style={cardStyle}
+                    onPointerDown={(e) => handlePointerDown(e, id)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onClick={() => handleNodeClick(id)}
                     onDoubleClick={() => onDrill(id)}
                   >
                     <div className="node-arab">{p.nama_arab}</div>
@@ -1068,7 +1172,9 @@ const CSS = `
 .nav-group button:disabled { color: #b9b09a; cursor: not-allowed; }
 .actions-group { margin-left:auto; gap:8px; background:none; border:none; padding:0; }
 .btn-secondary.active { background: var(--teal); color:#fff; }
-.legend-bar { display:flex; flex-wrap:wrap; gap:8px; padding: 0 22px 12px; }
+.legend-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding: 0 22px 12px; }
+.legend-label { font-size:10.5px; font-weight:700; color: var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px; }
+.legend-label-sep { margin-left:10px; }
 .legend-chip { display:flex; align-items:center; gap:6px; font-size:11px; background:#fff; border:1px solid var(--line); padding:4px 10px; border-radius:20px; }
 .legend-dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; }
 .quote-block { margin: 4px 22px 0; background: var(--teal); color:#fff; border-radius:8px; padding:10px 16px; text-align:center; }
@@ -1100,7 +1206,10 @@ const CSS = `
 .graph-edge { fill:none; stroke: var(--line); stroke-width:1.6; }
 .arrow-head { fill: var(--line); }
 .graph-level { display:flex; justify-content:center; gap:36px; margin-bottom:60px; position:relative; z-index:1; }
-.graph-node-slot { display:flex; flex-direction:column; align-items:center; }
+.graph-node-slot { display:flex; flex-direction:column; align-items:center; position:relative; }
+.graph-node-slot .node-card { cursor: grab; touch-action: none; }
+.graph-node-slot .node-card:active { cursor: grabbing; }
+.node-card.node-dragged { box-shadow: 0 6px 16px rgba(42,33,25,0.25); }
 .graph-edge-label { position:absolute; transform:translate(-50%,-50%); z-index:2; pointer-events:none; }
 
 .tree-node-wrap { display:flex; flex-direction:column; align-items:center; }
