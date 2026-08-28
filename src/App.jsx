@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import {
   Plus, Trash2, X, GitBranch,
-  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered, MapPin, Users
+  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered, MapPin
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -88,70 +88,6 @@ const SEED_SANAD = [
   { id: uid("s"), guru_id: "p_warsh", murid_id: "p_guru_penang", riwayat: "Warsh 'an Nafi'", catatan: "" },
 ];
 
-/* ---------------------------------------------------------
-   IMAM QIRAAT SEPULUH — 10 Imam Qiraat mutawatir beserta
-   riwayat masyhur masing-masing. Disambungkan sebagai murid
-   kepada p_sulami (contoh generasi Tabi'in) supaya setiap Imam
-   kekal bersambung ke Rasulullah ﷺ dalam paparan pokok sanad.
-   NOTA: sambungan generasi ini dipermudahkan untuk tujuan
-   demonstrasi — sila semak & gantikan dengan sanad muktabar
-   (cth. Ghayah al-Nihayah, al-Nashr fi al-Qiraat al-'Ashr).
---------------------------------------------------------- */
-const IMAM_QIRAAT_SEED_PERAWI = [
-  { id: "p_ibnkathir", nama_arab: "عَبْد اللّٰه بْن كَثِير الدَّارِيّ", nama_rumi: "Ibn Kathir al-Makki", gelaran: "Imam Makkah", tabaqat: "Imam Qiraat", wafat: "120", kategori: "Makkah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_abuamr", nama_arab: "أَبُو عَمْرو بْن العَلَاء", nama_rumi: "Abu 'Amr al-Basri", gelaran: "Imam Basrah", tabaqat: "Imam Qiraat", wafat: "154", kategori: "Basrah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_ibnamir", nama_arab: "عَبْد اللّٰه بْن عَامِر اليَحْصُبِيّ", nama_rumi: "Ibn 'Amir al-Syami", gelaran: "Imam Syam", tabaqat: "Imam Qiraat", wafat: "118", kategori: "Syam", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_hamzah", nama_arab: "حَمْزَة بْن حَبِيب الزَّيَّات", nama_rumi: "Hamzah al-Kufi", gelaran: "Imam Kufah", tabaqat: "Imam Qiraat", wafat: "156", kategori: "Kufah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_kisaie", nama_arab: "عَلِيّ بْن حَمْزَة الكِسَائِيّ", nama_rumi: "Al-Kisa'ie", gelaran: "Imam Kufah", tabaqat: "Imam Qiraat", wafat: "189", kategori: "Kufah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_abujaafar", nama_arab: "يَزِيد بْن القَعْقَاع", nama_rumi: "Abu Ja'far al-Madani", gelaran: "Imam Madinah", tabaqat: "Imam Qiraat", wafat: "130", kategori: "Madinah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_yaqub", nama_arab: "يَعْقُوب بْن إِسْحَاق الحَضْرَمِيّ", nama_rumi: "Ya'qub al-Basri", gelaran: "Imam Basrah", tabaqat: "Imam Qiraat", wafat: "205", kategori: "Basrah", catatan: "Salah seorang daripada Imam Qiraat Sepuluh — sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-  { id: "p_khalaf", nama_arab: "خَلَف بْن هِشَام البَزَّار", nama_rumi: "Khalaf al-'Asyir", gelaran: "Imam Kufah", tabaqat: "Imam Qiraat", wafat: "229", kategori: "Kufah", catatan: "Dikenali sebagai 'al-'Asyir' — Imam kesepuluh yang melengkapkan Qiraat Sepuluh. Sila semak & lengkapkan sanad sebenar mengikut sumber muktabar." },
-];
-
-const IMAM_QIRAAT_SEED_SANAD = [
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_nafi", riwayat: "Qalun & Warsy 'an Nafi'", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_ibnkathir", riwayat: "Al-Bazzi & Qunbul 'an Ibn Kathir", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_abuamr", riwayat: "Al-Duri & Al-Susi 'an Abu 'Amr", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_ibnamir", riwayat: "Hisyam & Ibn Zakwan 'an Ibn 'Amir", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_asim", riwayat: "Syu'bah & Hafs 'an 'Asim", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_hamzah", riwayat: "Khalaf & Khallad 'an Hamzah", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_kisaie", riwayat: "Abu al-Harith & Al-Duri 'an al-Kisa'ie", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_abujaafar", riwayat: "Ibn Wardan & Ibn Jammaz 'an Abu Ja'far", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_yaqub", riwayat: "Ruways & Rauh 'an Ya'qub", catatan: "" },
-  { id: uid("s"), guru_id: "p_sulami", murid_id: "p_khalaf", riwayat: "Ishaq & Idris 'an Khalaf", catatan: "" },
-];
-
-/* Susunan tetap papan muka 10 Imam Qiraat untuk panel/dashboard. */
-const IMAM_QIRAAT_SEPULUH = [
-  { id: "p_nafi", order: 1 },
-  { id: "p_ibnkathir", order: 2 },
-  { id: "p_abuamr", order: 3 },
-  { id: "p_ibnamir", order: 4 },
-  { id: "p_asim", order: 5 },
-  { id: "p_hamzah", order: 6 },
-  { id: "p_kisaie", order: 7 },
-  { id: "p_abujaafar", order: 8 },
-  { id: "p_yaqub", order: 9 },
-  { id: "p_khalaf", order: 10 },
-];
-
-/* Cantumkan data 10 Imam Qiraat ke dalam senarai perawi/sanad sedia ada
-   (termasuk data lama yang sudah tersimpan di localStorage), tanpa
-   menduplikasi rekod yang sudah wujud. */
-function withImamQiraatSeed(perawiList, sanadList) {
-  const existingIds = new Set(perawiList.map((p) => p.id));
-  const newPerawi = IMAM_QIRAAT_SEED_PERAWI.filter((p) => !existingIds.has(p.id));
-  const mergedPerawi = newPerawi.length ? [...perawiList, ...newPerawi] : perawiList;
-
-  const existingEdgeKeys = new Set(sanadList.map((e) => `${e.guru_id}>${e.murid_id}`));
-  const newSanad = IMAM_QIRAAT_SEED_SANAD.filter(
-    (e) => !existingEdgeKeys.has(`${e.guru_id}>${e.murid_id}`)
-  );
-  const mergedSanad = newSanad.length ? [...sanadList, ...newSanad] : sanadList;
-
-  return { perawi: mergedPerawi, sanad: mergedSanad };
-}
-
 const STORAGE_KEY = "pokok-sanad-data-v1";
 
 export default function PokokSanadApp() {
@@ -176,7 +112,6 @@ export default function PokokSanadApp() {
   const [showRanking, setShowRanking] = useState(false);
   const [rankingTabaqat, setRankingTabaqat] = useState("Semua");
   const [showDirectory, setShowDirectory] = useState(false);
-  const [showImamPanel, setShowImamPanel] = useState(false);
 
   /* ---------- load (localStorage) ---------- */
   useEffect(() => {
@@ -184,23 +119,17 @@ export default function PokokSanadApp() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const data = JSON.parse(raw);
-        const { perawi: mergedPerawi, sanad: mergedSanad } = withImamQiraatSeed(
-          data.perawi || [],
-          data.sanad || []
-        );
-        setPerawi(mergedPerawi);
-        setSanad(mergedSanad);
-        setRootId(data.rootId || mergedPerawi[0]?.id || null);
+        setPerawi(data.perawi || []);
+        setSanad(data.sanad || []);
+        setRootId(data.rootId || (data.perawi && data.perawi[0]?.id) || null);
       } else {
-        const { perawi: mergedPerawi, sanad: mergedSanad } = withImamQiraatSeed(SEED_PERAWI, SEED_SANAD);
-        setPerawi(mergedPerawi);
-        setSanad(mergedSanad);
+        setPerawi(SEED_PERAWI);
+        setSanad(SEED_SANAD);
         setRootId("p_nabi");
       }
     } catch {
-      const { perawi: mergedPerawi, sanad: mergedSanad } = withImamQiraatSeed(SEED_PERAWI, SEED_SANAD);
-      setPerawi(mergedPerawi);
-      setSanad(mergedSanad);
+      setPerawi(SEED_PERAWI);
+      setSanad(SEED_SANAD);
       setRootId("p_nabi");
     } finally {
       setLoading(false);
@@ -512,9 +441,6 @@ export default function PokokSanadApp() {
           <button className="btn-secondary" onClick={() => setShowDirectory(true)} title="Senarai guru al-Quran Malaysia ikut negeri">
             <MapPin size={15} /> Guru Malaysia
           </button>
-          <button className="btn-secondary" onClick={() => setShowImamPanel(true)} title="Papar sanad ikut 10 Imam Qiraat">
-            <Users size={15} /> 10 Imam Qiraat
-          </button>
           <button className="btn-secondary" onClick={() => window.print()} title="Jana PDF / cetak keseluruhan sanad">
             <Printer size={15} /> Jana PDF
           </button>
@@ -674,16 +600,6 @@ export default function PokokSanadApp() {
           groups={directoryGroups}
           onClose={() => setShowDirectory(false)}
           onSelect={viewSanadOf}
-        />
-      )}
-
-      {showImamPanel && (
-        <ImamQiraatModal
-          imamList={IMAM_QIRAAT_SEPULUH}
-          perawiMap={perawiMap}
-          sanad={sanad}
-          onClose={() => setShowImamPanel(false)}
-          onSelect={(id) => { viewSanadOf(id); setShowImamPanel(false); }}
         />
       )}
 
@@ -925,54 +841,6 @@ function DirectoryModal({ groups, onClose, onSelect }) {
               </div>
             ))
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------
-   10 IMAM QIRAAT — papan muka dashboard untuk setiap Imam
-   Qiraat Sepuluh. Klik nama Imam terus papar jalur sanad
-   Imam tersebut sahaja (arah "Guru ↑") sehingga Nabi
-   Muhammad ﷺ, ditapis mengikut riwayat beliau.
---------------------------------------------------------- */
-function ImamQiraatModal({ imamList, perawiMap, sanad, onClose, onSelect }) {
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>Imam Qiraat Sepuluh</h3>
-          <button onClick={onClose}><X size={16} /></button>
-        </div>
-        <p className="ranking-note">
-          Klik papan nama seorang Imam untuk papar jalur sanad beliau sahaja, sehingga Nabi Muhammad ﷺ.
-        </p>
-        <div className="imam-grid">
-          {imamList.map((entry) => {
-            const p = perawiMap[entry.id];
-            if (!p) return null;
-            const riwayatMasuk = Array.from(
-              new Set(
-                sanad
-                  .filter((e) => e.murid_id === entry.id)
-                  .map((e) => e.riwayat)
-                  .filter((r) => r && r !== "Umum")
-              )
-            );
-            return (
-              <button className="imam-card" key={entry.id} onClick={() => onSelect(entry.id)}>
-                <span className="imam-order">{entry.order}</span>
-                <span className="imam-arab">{p.nama_arab}</span>
-                <span className="imam-rumi">{p.nama_rumi}</span>
-                {p.gelaran && <span className="imam-gelaran">{p.gelaran}</span>}
-                {p.wafat && <span className="wafat">w. {p.wafat}H</span>}
-                {riwayatMasuk.length > 0 && (
-                  <span className="imam-riwayat">{riwayatMasuk.join(" · ")}</span>
-                )}
-              </button>
-            );
-          })}
         </div>
       </div>
     </div>
@@ -1316,16 +1184,6 @@ const CSS = `
 .ranking-arab { font-family:'Amiri',serif; font-size:13.5px; }
 .ranking-rumi { font-size:10.5px; color: var(--ink-soft); }
 .ranking-peringkat { font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:700; background: var(--gold); color:#fff; padding:2px 8px; border-radius:20px; flex-shrink:0; }
-
-.imam-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; margin-top:6px; max-height: 460px; overflow-y:auto; }
-.imam-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; border:1px solid var(--line); background:#fff; border-radius:8px; padding:10px 30px 10px 12px; cursor:pointer; font-family:'Work Sans',sans-serif; }
-.imam-card:hover { border-color: var(--teal); box-shadow: 0 2px 8px rgba(31,75,67,0.12); }
-.imam-order { position:absolute; top:8px; right:8px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:700; color:#fff; background: var(--gold); width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.imam-arab { font-family:'Amiri',serif; font-size:15px; }
-.imam-rumi { font-size:11.5px; color: var(--ink); font-weight:600; }
-.imam-gelaran { font-size:10px; color: var(--teal); }
-.imam-riwayat { font-size:9.5px; color: var(--maroon); margin-top:2px; }
-@media (max-width: 480px) { .imam-grid { grid-template-columns: 1fr; } }
 
 .legend-hidden { display:none; }
 
