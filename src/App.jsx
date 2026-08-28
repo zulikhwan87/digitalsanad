@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import {
   Plus, Trash2, X, GitBranch,
-  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered
+  Home, Search, Loader2, Pencil, ArrowLeft, Check, User, Palette, Printer, ListOrdered, MapPin
 } from "lucide-react";
 
 /* ---------------------------------------------------------
@@ -21,6 +21,12 @@ const TABAQAT = [
   "Ulama Kemudian",
   "Ulama",
   "Ulama Semasa",
+];
+
+const NEGERI = [
+  "Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang",
+  "Perak", "Perlis", "Pulau Pinang", "Sabah", "Sarawak", "Selangor",
+  "Terengganu", "Wilayah Persekutuan",
 ];
 
 const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 9)}`;
@@ -52,6 +58,9 @@ const SEED_PERAWI = [
   { id: "p_qari_mesir", nama_arab: "قَارِئ مِصْرِيّ (مِثَال)", nama_rumi: "Contoh Qari Mesir", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Mesir", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
   { id: "p_qari_syam", nama_arab: "قَارِئ شَامِيّ (مِثَال)", nama_rumi: "Contoh Qari Syam", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Syam", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
   { id: "p_qari_kuwait", nama_arab: "قَارِئ كُوَيْتِيّ (مِثَال)", nama_rumi: "Contoh Qari Kuwait", gelaran: "", tabaqat: "Ulama Kemudian", wafat: "", kategori: "Kuwait", catatan: "Placeholder — gantikan dengan nama qari sebenar." },
+  { id: "p_guru_selangor", nama_arab: "قَارِئ سلاڠور (مِثَال)", nama_rumi: "Contoh Guru Selangor", gelaran: "", tabaqat: "Ulama Semasa", wafat: "", kategori: "Selangor", catatan: "Placeholder — gantikan dengan nama guru sebenar." },
+  { id: "p_guru_kelantan", nama_arab: "قَارِئ كلنتن (مِثَال)", nama_rumi: "Contoh Guru Kelantan", gelaran: "", tabaqat: "Ulama Semasa", wafat: "", kategori: "Kelantan", catatan: "Placeholder — gantikan dengan nama guru sebenar." },
+  { id: "p_guru_penang", nama_arab: "قَارِئ ڤيناڠ (مِثَال)", nama_rumi: "Contoh Guru Pulau Pinang", gelaran: "", tabaqat: "Ulama Semasa", wafat: "", kategori: "Pulau Pinang", catatan: "Placeholder — gantikan dengan nama guru sebenar." },
 ];
 
 const SEED_SANAD = [
@@ -74,6 +83,9 @@ const SEED_SANAD = [
   { id: uid("s"), guru_id: "p_syatibiyyah", murid_id: "p_qari_mesir", riwayat: "Warsh 'an Nafi'", catatan: "" },
   { id: uid("s"), guru_id: "p_syatibiyyah", murid_id: "p_qari_syam", riwayat: "Hafs 'an 'Asim", catatan: "" },
   { id: uid("s"), guru_id: "p_tayyibah", murid_id: "p_qari_kuwait", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_hafs", murid_id: "p_guru_selangor", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_hafs", murid_id: "p_guru_kelantan", riwayat: "Hafs 'an 'Asim", catatan: "" },
+  { id: uid("s"), guru_id: "p_warsh", murid_id: "p_guru_penang", riwayat: "Warsh 'an Nafi'", catatan: "" },
 ];
 
 const STORAGE_KEY = "pokok-sanad-data-v1";
@@ -99,6 +111,7 @@ export default function PokokSanadApp() {
   const [showLegend, setShowLegend] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [rankingTabaqat, setRankingTabaqat] = useState("Semua");
+  const [showDirectory, setShowDirectory] = useState(false);
 
   /* ---------- load (localStorage) ---------- */
   useEffect(() => {
@@ -203,6 +216,36 @@ export default function PokokSanadApp() {
       .map((p) => ({ ...p, peringkat: distanceMap[p.id] }))
       .sort((a, b) => a.peringkat - b.peringkat || a.nama_rumi.localeCompare(b.nama_rumi));
   }, [perawi, distanceMap, rankingTabaqat]);
+
+  /* Direktori guru al-Quran Malaysia — dikumpul ikut negeri (medan kategori
+     yang sepadan dengan salah satu daripada 14 negeri/wilayah persekutuan). */
+  const directoryGroups = useMemo(() => {
+    const map = {};
+    perawi.forEach((p) => {
+      if (p.kategori && NEGERI.includes(p.kategori)) {
+        if (!map[p.kategori]) map[p.kategori] = [];
+        map[p.kategori].push(p);
+      }
+    });
+    return NEGERI.filter((n) => map[n] && map[n].length > 0).map((n) => ({
+      negeri: n,
+      list: map[n].sort((a, b) => a.nama_rumi.localeCompare(b.nama_rumi)),
+    }));
+  }, [perawi]);
+
+  const viewSanadOf = (id) => {
+    /* Auto-tapis ikut riwayat sanad guru ini (kalau semuanya satu riwayat
+       yang sama), supaya jalur yang dipaparkan bersih & khusus — bukan
+       bercampur dengan riwayat lain yang tak berkaitan. */
+    const guruEdges = sanad.filter((e) => e.murid_id === id);
+    const riwayatSet = new Set(guruEdges.map((e) => e.riwayat).filter((r) => r && r !== "Umum"));
+    setRiwayatFilter(riwayatSet.size === 1 ? Array.from(riwayatSet)[0] : "Semua");
+    setDirection("naik");
+    setRootHistory([]);
+    setRootId(id);
+    setSelectedId(id);
+    setShowDirectory(false);
+  };
 
   const drillInto = (id) => {
     if (id === rootId) return;
@@ -395,6 +438,9 @@ export default function PokokSanadApp() {
           <button className="btn-secondary" onClick={() => setShowRanking(true)} title="Bandingkan kedudukan sanad semua perawi">
             <ListOrdered size={15} /> Kedudukan Sanad
           </button>
+          <button className="btn-secondary" onClick={() => setShowDirectory(true)} title="Senarai guru al-Quran Malaysia ikut negeri">
+            <MapPin size={15} /> Guru Malaysia
+          </button>
           <button className="btn-secondary" onClick={() => window.print()} title="Jana PDF / cetak keseluruhan sanad">
             <Printer size={15} /> Jana PDF
           </button>
@@ -546,6 +592,14 @@ export default function PokokSanadApp() {
           setRankingTabaqat={setRankingTabaqat}
           onClose={() => setShowRanking(false)}
           onSelect={(id) => { setSelectedId(id); setShowRanking(false); }}
+        />
+      )}
+
+      {showDirectory && (
+        <DirectoryModal
+          groups={directoryGroups}
+          onClose={() => setShowDirectory(false)}
+          onSelect={viewSanadOf}
         />
       )}
 
@@ -750,6 +804,50 @@ function SanadGraph({ rootId, perawiMap, sanad, riwayatFilter, direction, select
 }
 
 /* ---------------------------------------------------------
+   GURU AL-QURAN MALAYSIA — direktori ikut 14 negeri. Klik nama
+   terus papar jalur sanad guru itu (arah "Guru ↑") sehingga
+   Nabi Muhammad ﷺ.
+--------------------------------------------------------- */
+function DirectoryModal({ groups, onClose, onSelect }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Guru Al-Quran Malaysia</h3>
+          <button onClick={onClose}><X size={16} /></button>
+        </div>
+        <p className="ranking-note">
+          Disusun ikut negeri (isi medan "Kategori" dengan nama negeri bila tambah perawi bertabaqat
+          "Ulama Semasa"). Klik nama untuk terus papar jalur sanad guru tersebut sehingga Nabi Muhammad ﷺ.
+        </p>
+        <div className="directory-list">
+          {groups.length === 0 ? (
+            <p className="muted">
+              Belum ada guru direkodkan ikut negeri lagi. Tambah perawi baharu, tetapkan Tabaqat kepada
+              "Ulama Semasa" dan Kategori kepada nama negeri (cth. "Selangor", "Kelantan").
+            </p>
+          ) : (
+            groups.map((g) => (
+              <div className="directory-group" key={g.negeri}>
+                <div className="directory-state">
+                  {g.negeri} <span className="directory-count">({g.list.length})</span>
+                </div>
+                {g.list.map((p) => (
+                  <button className="directory-row" key={p.id} onClick={() => onSelect(p.id)}>
+                    <span className="ranking-arab">{p.nama_arab}</span>
+                    <span className="ranking-rumi">{p.nama_rumi}{p.gelaran ? ` · ${p.gelaran}` : ""}</span>
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------
    KEDUDUKAN SANAD — senarai perbandingan peringkat sanad
    (nombor lebih kecil = sanad lebih tinggi/hampir Rasulullah ﷺ)
 --------------------------------------------------------- */
@@ -825,8 +923,16 @@ function PerawiModal({ initial, onClose, onSave }) {
         <label>Gelaran
           <input value={form.gelaran} onChange={(e) => set("gelaran", e.target.value)} placeholder="Contoh: Imam Kufah" />
         </label>
-        <label>Kategori (negara / kumpulan qiraat)
-          <input value={form.kategori} onChange={(e) => set("kategori", e.target.value)} placeholder="Contoh: Mesir, Syam, Kuwait" />
+        <label>Kategori (negeri Malaysia / negara / kumpulan qiraat)
+          <input
+            value={form.kategori}
+            onChange={(e) => set("kategori", e.target.value)}
+            placeholder="Contoh: Selangor, Kelantan, atau Mesir, Syam"
+            list="negeri-suggest"
+          />
+          <datalist id="negeri-suggest">
+            {NEGERI.map((n) => <option key={n} value={n} />)}
+          </datalist>
         </label>
         <div className="modal-row">
           <label>Tabaqat
@@ -1064,6 +1170,11 @@ const CSS = `
 .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 
 .modal-wide { width: 460px; }
+.directory-list { max-height: 420px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; margin-top:4px; }
+.directory-state { font-family:'Amiri',serif; font-size:14px; color: var(--teal); font-weight:700; border-bottom:1px solid var(--line); padding-bottom:4px; margin-bottom:6px; }
+.directory-count { font-family:'IBM Plex Mono',monospace; font-size:10px; color: var(--ink-soft); font-weight:400; }
+.directory-row { display:flex; flex-direction:column; align-items:flex-start; width:100%; text-align:left; border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 10px; margin-bottom:5px; cursor:pointer; font-family:'Work Sans',sans-serif; }
+.directory-row:hover { border-color: var(--teal); }
 .ranking-note { font-size:11px; color: var(--ink-soft); background: rgba(184,134,46,0.12); border:1px solid var(--gold-light); border-radius:6px; padding:8px 10px; margin:0; }
 .ranking-list { display:flex; flex-direction:column; gap:6px; max-height: 360px; overflow-y:auto; margin-top:4px; }
 .ranking-row { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 10px; cursor:pointer; text-align:left; font-family:'Work Sans',sans-serif; }
