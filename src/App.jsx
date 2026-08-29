@@ -467,6 +467,20 @@ export default function PokokSanadApp() {
           <button className="btn-secondary" onClick={() => setShowDirectory(true)} title="Senarai guru al-Quran Malaysia ikut negeri">
             <MapPin size={15} /> Guru Malaysia
           </button>
+
+          <a
+            href="/sanadhafs.html"
+            className="btn-secondary"
+            style={{
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px"
+            }}
+          >
+            Sanad Hafs
+          </a>
+          
           <button
             className="btn-secondary"
             onClick={() => setNodePositionOverrides({})}
