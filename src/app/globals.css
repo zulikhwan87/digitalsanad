@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #7C3AED;
+  --primary-dark: #3B0764;
+  --secondary-gold: #A855F7;
+  --background: #FAF8FF;
+  --surface: #FFFFFF;
+  --text: #1F2937;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--text);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.islamic-pattern-bg {
+  background-color: #3B0764;
+  background-image: radial-gradient(#A855F7 0.75px, transparent 0.75px), radial-gradient(#7C3AED 0.75px, #3B0764 0.75px);
+  background-size: 32px 32px;
+  background-position: 0 0, 16px 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
